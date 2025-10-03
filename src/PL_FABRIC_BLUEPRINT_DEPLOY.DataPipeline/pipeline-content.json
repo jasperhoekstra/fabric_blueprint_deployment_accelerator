@@ -1,0 +1,39 @@
+{
+  "properties": {
+    "description": "Trigger the Fabric deployment accelerator notebook from a Fabric pipeline.",
+    "annotations": [],
+    "parameters": {
+      "notebookPath": {
+        "type": "string",
+        "defaultValue": "setup/NB_FABRIC_BLUEPRINT_DEPLOYMENT"
+      }
+    },
+    "activities": [
+      {
+        "name": "RunDeploymentAcceleratorNotebook",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "typeProperties": {
+          "notebookId": "00000000-0000-0000-0000-000000000000",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "notebookPath": {
+              "type": "string",
+              "value": {
+                "type": "Expression",
+                "value": "@pipeline().parameters.notebookPath"
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
