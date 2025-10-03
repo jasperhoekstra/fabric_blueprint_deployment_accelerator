@@ -1,0 +1,219 @@
+version: 1
+metadata:
+  description: >-
+    Central configuration for the Fabric metadata-driven deployment accelerator.
+    The SQL orchestration database stores all domains, layers, workspace assignments,
+    and table-level governance rules. This file captures the SQL connection settings,
+    default DTAP environments, and layer templates that the deployer uses when
+    materialising manifests from the database.
+  owner: platform-team@contoso.com
+sql:
+  deploymentPackage: config/sql_deployment.json
+  connection:
+    driver: "{ODBC Driver 18 for SQL Server}"
+    server: "tcp:<your-fabric-sql-endpoint>"
+    database: "FabricOrchestration"
+    authentication: "ServicePrincipal"  # or ManagedIdentity / AadIntegrated
+    tenantId: "00000000-0000-0000-0000-000000000000"
+    clientId: "00000000-0000-0000-0000-000000000000"
+    clientSecret: "<client-secret>"
+    encrypt: true
+  options:
+    commandTimeoutSeconds: 120
+    trustServerCertificate: false
+    createDatabaseIfNotExists: true
+
+environments:
+  dev:
+    displayName: Development
+    cicdStage: dev
+    defaultOptionalLayers:
+      playground: true
+      data_science: true
+      analytics: true
+      sharing: false
+      operations: true
+      monitoring: true
+  test:
+    displayName: Test
+    cicdStage: test
+    defaultOptionalLayers:
+      playground: false
+      data_science: true
+      analytics: true
+      sharing: false
+      operations: true
+      monitoring: true
+  acc:
+    displayName: Acceptance
+    cicdStage: acc
+    defaultOptionalLayers:
+      playground: false
+      data_science: false
+      analytics: true
+      sharing: true
+      operations: true
+      monitoring: true
+  prod:
+    displayName: Production
+    cicdStage: prod
+    defaultOptionalLayers:
+      playground: false
+      data_science: false
+      analytics: true
+      sharing: true
+      operations: true
+      monitoring: true
+
+layers:
+  required:
+    raw:
+      code: 1000_RAW
+      workspaceRole: landing
+      description: Landing and ingestion workspace for raw zone entities.
+      artifactDefaults:
+        lakehouses:
+          - name: "{domain}_landing"
+            purpose: landing
+            retentionDays: 90
+      governance:
+        classification: Confidential
+        retentionDays: 90
+        piiFlag: false
+    consolidated:
+      code: 2000_CONSOLIDATED
+      workspaceRole: silver
+      description: Consolidated (silver) layer hosting cleansed Delta tables.
+      artifactDefaults:
+        lakehouses:
+          - name: "{domain}_consolidated"
+            purpose: silver
+            retentionDays: 365
+      governance:
+        classification: Confidential
+        retentionDays: 365
+        piiFlag: false
+    curated:
+      code: 3000_CURATED
+      workspaceRole: gold
+      description: Curated (gold) layer with semantic-ready Delta tables and measures.
+      artifactDefaults:
+        lakehouses:
+          - name: "{domain}_curated"
+            purpose: gold
+            retentionDays: 1095
+      governance:
+        classification: Secret
+        retentionDays: 1095
+        piiFlag: true
+  optional:
+    playground:
+      code: 400x_DOMAIN_PLAYGROUND
+      workspaceRole: playground
+      description: Domain managed experimentation workspace for analysts.
+      artifactDefaults:
+        lakehouses: []
+      governance:
+        classification: Internal
+        retentionDays: 60
+        piiFlag: false
+    data_science:
+      code: 500x_DOMAIN_DATA_SCIENCE
+      workspaceRole: data_science
+      description: Domain data science sandbox with ML workloads.
+      artifactDefaults:
+        lakehouses:
+          - name: "{domain}_ml_featurestore"
+            purpose: features
+            retentionDays: 180
+      governance:
+        classification: Confidential
+        retentionDays: 180
+        piiFlag: true
+    analytics:
+      code: 600x_DOMAIN_ANALYTICS
+      workspaceRole: analytics
+      description: Curated marts optimized for self-service BI.
+      artifactDefaults:
+        lakehouses:
+          - name: "{domain}_analytics"
+            purpose: marts
+            retentionDays: 730
+      governance:
+        classification: Confidential
+        retentionDays: 730
+        piiFlag: false
+    sharing:
+      code: 700x_DOMAIN_SHARING
+      workspaceRole: sharing
+      description: Certified data products for external or cross-domain consumption.
+      artifactDefaults:
+        lakehouses:
+          - name: "{domain}_sharing"
+            purpose: exports
+            retentionDays: 365
+      governance:
+        classification: External
+        retentionDays: 365
+        piiFlag: false
+    operations:
+      code: 800x_DOMAIN_OPERATIONS
+      workspaceRole: operations
+      description: Operational automation for domain owned processes.
+      artifactDefaults:
+        lakehouses: []
+      governance:
+        classification: Internal
+        retentionDays: 120
+        piiFlag: false
+    monitoring:
+      code: 900x_DOMAIN_MONITORING
+      workspaceRole: monitoring
+      description: Observability workspace for data quality, SLA and lineage insights.
+      artifactDefaults:
+        lakehouses:
+          - name: "{domain}_observability"
+            purpose: monitoring
+            retentionDays: 365
+      governance:
+        classification: Internal
+        retentionDays: 365
+        piiFlag: false
+
+# Optionally seed initial domains into the SQL database when running the deployer with --seed.
+# Example structure:
+# seedDomains:
+#   - name: retail
+#     code: RET
+#     displayName: Retail
+#     layers:
+#       required: [raw, consolidated, curated]
+#       optional:
+#         analytics:
+#           enabled: true
+#     environments:
+#       dev:
+#         raw:
+#           workspaceGuid: "00000000-0000-0000-0000-000000000000"
+#           workspaceName: "DEV_1000_RAW_RETAIL"
+#     tables:
+#       - layerKey: curated
+#         schema: curated
+#         name: orders
+#         classification: Confidential
+#         sensitivityTag: PII
+#         hasSensitiveData: true
+#         retention:
+#           policy: regulatory
+#           days: 1825
+#         qualityRuleset: orders_curated_rules
+#         tags: [orders, gold, reporting]
+#     semanticModels:
+#       - name: RetailCurated
+#         layerKey: curated
+#         datasetName: RetailCuratedDataset
+#         refreshPipeline: PL_RETAIL_REFRESH
+#         tags: [retail, curated]
+#         classification: Confidential
+#         hasSensitiveData: false
+seedDomains: []
